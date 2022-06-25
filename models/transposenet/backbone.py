@@ -34,6 +34,7 @@ class BackboneBase(nn.Module):
 class Backbone(BackboneBase):
     def __init__(self, backbone_model_path: str, reduction):
         backbone = torch.load(backbone_model_path)
+        backbone.set_swish(memory_efficient=False)
         super().__init__(backbone, reduction)
 
 

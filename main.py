@@ -152,10 +152,8 @@ if __name__ == "__main__":
                 if freeze:
                     res = model.forward_heads(transformers_res)
                 else:
-                    res = model(minibatch)
+                    est_pose, est_scene_log_distr = model(minibatch.get('img'), minibatch.get('scene'))
 
-                est_pose = res.get('pose')
-                est_scene_log_distr = res.get('scene_log_distr')
                 if est_scene_log_distr is not None:
                     # Pose Loss + Scene Loss
                     criterion = pose_loss(est_pose, gt_pose) + nll_loss(est_scene_log_distr, gt_scene)
