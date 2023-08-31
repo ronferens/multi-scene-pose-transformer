@@ -32,8 +32,6 @@ class EMSTransPoseNet(MSTransPoseNet):
         max_indices: the index of the max value in the scene distribution
         returns: dictionary with key-value 'pose'--expected pose (NX7) and scene_log_distr
         """
-        # global_desc_t = transformers_res.get('global_desc_t')
-        # global_desc_rot = transformers_res.get('global_desc_rot')
         x_t = self.regressor_head_t(global_desc_t)
         x_rot = self.regressor_head_rot(global_desc_rot)
         expected_pose = torch.cat((x_t, x_rot), dim=1)

@@ -56,8 +56,6 @@ class MSTransPoseNet(nn.Module):
             scene_log_distr: the log softmax over the scenes
             max_indices: the index of the max value in the scene distribution
         """
-        # samples = data.get('img')
-        # scene_indices = data.get('scene')
         batch_size = samples.shape[0]
 
         # Handle data structures
@@ -83,9 +81,6 @@ class MSTransPoseNet(nn.Module):
                                                pos[1])[0][0]
 
         # Get the scene index with FC + log-softmax
-        # scene_log_distr = self.log_softmax(self.scene_embed(torch.cat((local_descs_t,
-        #                                                                local_descs_rot), dim=2))).squeeze(2)
-
         scene_log_distr = torch.log(nn.Softmax(dim=1)(self.scene_embed(torch.cat((local_descs_t,
                                                                                   local_descs_rot), dim=2)))).squeeze(2)
 
@@ -111,9 +106,6 @@ class MSTransPoseNet(nn.Module):
         max_indices: the index of the max value in the scene distribution
         returns: dictionary with key-value 'pose'--expected pose (NX7) and scene_log_distr
         """
-        # global_desc_t = transformers_res.get('global_desc_t')
-        # global_desc_rot = transformers_res.get('global_desc_rot')
-        # max_indices = transformers_res.get('max_indices') # We can only use the max index for weights selection
         batch_size = global_desc_t.shape[0]
         expected_pose = torch.zeros((batch_size,7)).to(global_desc_t.device).to(global_desc_t.dtype)
         for i in range(batch_size):
