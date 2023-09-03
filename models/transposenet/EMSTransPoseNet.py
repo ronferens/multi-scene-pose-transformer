@@ -3,11 +3,6 @@ The Efficient Multi-Scene TransPoseNet model
 """
 
 import torch
-import torch.nn.functional as F
-from torch import nn
-from .transformer import Transformer
-from .pencoder import NestedTensor, nested_tensor_from_tensor_list
-from .backbone import build_backbone
 from .MSTransPoseNet import MSTransPoseNet, PoseRegressor
 
 
