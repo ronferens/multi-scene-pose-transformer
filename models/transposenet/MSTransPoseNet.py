@@ -9,6 +9,7 @@ from .transformer import Transformer
 from .pencoder import NestedTensor, nested_tensor_from_tensor_list
 from .backbone import build_backbone
 
+
 class MSTransPoseNet(nn.Module):
 
     def __init__(self, config, pretrained_path):
