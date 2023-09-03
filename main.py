@@ -31,15 +31,14 @@ def test_scene(args, config, model):
         for i, minibatch in enumerate(dataloader, 0):
             for k, v in minibatch.items():
                 minibatch[k] = v.to(device)
+
             minibatch['scene'] = None  # avoid using ground-truth scene during prediction
-            minibatch['cluster_id_position'] = None  # avoid using ground-truth cluster during prediction
-            minibatch['cluster_id_orientation'] = None  # avoid using ground-truth cluster during prediction
 
             gt_pose = minibatch.get('pose').to(dtype=torch.float32)
 
             # Forward pass to predict the pose
             tic = time.time()
-            est_pose = model(minibatch).get('pose')
+            est_pose, _ = model(minibatch.get('img'), minibatch.get('scene'))
             toc = time.time()
 
             # Evaluate error
@@ -242,16 +241,20 @@ if __name__ == "__main__":
 
     else:  # Test
         if args.test_dataset_id is not None:
+            args.test_dataset_id = args.test_dataset_id.lower()
             f = open("{}_{}_report.csv".format(args.test_dataset_id, utils.get_stamp_from_log()), 'w')
             f.write("scene,pos,ori\n")
             if args.test_dataset_id == "7scenes":
+                dataset_file_prefix = './datasets/7scenes/abs_7scenes_pose.csv'
                 scenes = ["chess", "fire", "heads", "office", "pumpkin", "redkitchen", "stairs"]
             elif args.test_dataset_id == "cambridge":
+                dataset_file_prefix = './datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv'
                 scenes = ["KingsCollege", "OldHospital", "ShopFacade", "StMarysChurch"]
             else:
                 raise ValueError(f'Unsupported test_dataset_id: {args.test_dataset_id}')
 
             for scene in scenes:
+                args.labels_file = f'{dataset_file_prefix}_{scene}_test.csv'
                 stats = test_scene(args, config, model)
                 f.write("{},{:.3f},{:.3f}\n".format(scene, np.nanmedian(stats[:, 0]), np.nanmedian(stats[:, 1])))
             f.close()
