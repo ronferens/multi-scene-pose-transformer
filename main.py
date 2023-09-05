@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         freeze_param = False
                         break
                 if freeze_param:
-                        parameter.requires_grad_(False)
+                    parameter.requires_grad_(False)
 
         # Set the loss
         pose_loss = CameraPoseLoss(config).to(device)
@@ -147,9 +147,9 @@ if __name__ == "__main__":
         # Set the optimizer and scheduler
         params = list(model.parameters()) + list(pose_loss.parameters())
         optim = torch.optim.Adam(filter(lambda p: p.requires_grad, params),
-                                  lr=config.get('lr'),
-                                  eps=config.get('eps'),
-                                  weight_decay=config.get('weight_decay'))
+                                 lr=config.get('lr'),
+                                 eps=config.get('eps'),
+                                 weight_decay=config.get('weight_decay'))
         scheduler = torch.optim.lr_scheduler.StepLR(optim,
                                                     step_size=config.get('lr_scheduler_step_size'),
                                                     gamma=config.get('lr_scheduler_gamma'))
@@ -164,8 +164,8 @@ if __name__ == "__main__":
         equalize_scenes = config.get("equalize_scenes")
         dataset = CameraPoseDataset(args.dataset_path, args.labels_file, transform, equalize_scenes)
         loader_params = {'batch_size': config.get('batch_size'),
-                                  'shuffle': True,
-                                  'num_workers': config.get('n_workers')}
+                         'shuffle': True,
+                         'num_workers': config.get('n_workers')}
         dataloader = torch.utils.data.DataLoader(dataset, **loader_params)
 
         # Get training details
@@ -193,10 +193,11 @@ if __name__ == "__main__":
                 n_samples += batch_size
                 n_total_samples += batch_size
 
-                if freeze: # For TransPoseNet
+                if freeze:  # For TransPoseNet
                     model.eval()
                     with torch.no_grad():
-                        transformers_res = model.forward_transformers(minibatch)
+                        global_desc_t, global_desc_rot, scene_log_distr, max_indices = model.forward_transformers(
+                            minibatch.get('img'), minibatch.get('scene'))
                     model.train()
 
                 # Zero the gradients
@@ -204,7 +205,7 @@ if __name__ == "__main__":
 
                 # Forward pass to estimate the pose
                 if freeze:
-                    res = model.forward_heads(transformers_res)
+                    est_pose, est_scene_log_distr = model.forward_heads(global_desc_t, global_desc_rot, scene_log_distr, max_indices)
                 else:
                     est_pose, est_scene_log_distr = model(minibatch.get('img'), minibatch.get('scene'))
 
@@ -229,9 +230,9 @@ if __name__ == "__main__":
                     posit_err, orient_err = utils.pose_err(est_pose.detach(), gt_pose.detach())
                     logging.info("[Batch-{}/Epoch-{}] running camera pose loss: {:.3f}, "
                                  "camera pose error: {:.2f}[m], {:.2f}[deg]".format(
-                                                                        batch_idx+1, epoch+1, (running_loss/n_samples),
-                                                                        posit_err.mean().item(),
-                                                                        orient_err.mean().item()))
+                        batch_idx + 1, epoch + 1, (running_loss / n_samples),
+                        posit_err.mean().item(),
+                        orient_err.mean().item()))
             # Save checkpoint
             if (epoch % n_freq_checkpoint) == 0 and epoch > 0:
                 torch.save(model.state_dict(), checkpoint_prefix + '_checkpoint-{}.pth'.format(epoch))
