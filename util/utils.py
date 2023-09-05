@@ -4,7 +4,7 @@ import PIL
 import json
 from os.path import join, exists, split, realpath
 import time
-from os import mkdir, getcwd
+from os import makedirs, getcwd
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,13 +27,12 @@ def create_output_dir(name):
     :param name: (str) the name of the directory
     :return: the path to the outpur directory
     """
-    out_dir = join(getcwd(), name)
-    if not exists(out_dir):
-        mkdir(out_dir)
-    return out_dir
+    if not exists(name):
+        makedirs(name, exist_ok=True)
+    return name
 
 
-def init_logger():
+def init_logger(outpath: str = None, suffix: str = None) -> str:
     """
     Initialize the logger and create a time stamp for the file
     """
@@ -42,16 +41,22 @@ def init_logger():
     with open(join(path, 'log_config.json')) as json_file:
         log_config_dict = json.load(json_file)
         filename = log_config_dict.get('handlers').get('file_handler').get('filename')
-        filename = ''.join([filename, "_", time.strftime("%d_%m_%y_%H_%M", time.localtime()), ".log"])
+        filename = ''.join([filename, "_", time.strftime("%d_%m_%y_%H_%M", time.localtime())])
 
         # Creating logs' folder is needed
-        log_path = create_output_dir('out')
+        if outpath is not None:
+            log_path = create_output_dir(join(outpath, filename))
+        else:
+            log_path = create_output_dir(join(getcwd(), 'out', filename))
 
-        log_config_dict.get('handlers').get('file_handler')['filename'] = join(log_path, filename)
+        if suffix is not None:
+            filename += suffix
+        log_config_dict.get('handlers').get('file_handler')['filename'] = join(log_path, f'{filename}.log')
         logging.config.dictConfig(log_config_dict)
 
         # disable external modules' loggers (level warning and below)
         logging.getLogger(PIL.__name__).setLevel(logging.WARNING)
+        return log_path
 
 
 
