@@ -4,18 +4,23 @@ import PIL
 import json
 from os.path import join, exists, split, realpath
 import time
-from os import makedirs, getcwd
+from os import makedirs, getcwd, listdir
+from os.path import isfile
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
 from torchvision import transforms
 import shutil
+from typing import Dict
+from fnmatch import fnmatch
+import re
+
 
 ##########################
 # Logging and output utils
 ##########################
-def get_stamp_from_log():
+def get_stamp_from_log() -> str:
     """
     Get the time stamp from the log file
     :return:
@@ -23,7 +28,7 @@ def get_stamp_from_log():
     return split(logging.getLogger().handlers[0].baseFilename)[-1].replace(".log","")
 
 
-def create_output_dir(name):
+def create_output_dir(name: str) -> str:
     """
     Create a new directory for outputs, if it does not already exist
     :param name: (str) the name of the directory
@@ -63,6 +68,21 @@ def init_logger(outpath: str = None, suffix: str = None) -> str:
 
 def save_code_snapshot(fileprefix: str, path: str, modelname: str) -> None:
     shutil.make_archive(join(path, f'{fileprefix}_code_snapshot'), 'zip', join(getcwd(), f'models/{modelname.lower()}'))
+
+
+def get_checkpoint_list(path: str, ckpt_start_index: int = 0) -> Dict:
+    ckpts_list = {'ckpts': {}}
+    for name in sorted(listdir(path)):
+        if fnmatch(name, "*.pth"):
+            m = re.match(".+_checkpoint-(\d+).pth", name)
+            if m is not None:
+                indx = int(m.group(1))
+                if indx >= ckpt_start_index:
+                    ckpts_list['ckpts'][indx] = join(path, name)
+            elif 'final' in name:
+                ckpts_list['final'] = join(path, name)
+
+    return ckpts_list
 
 
 ##########################
