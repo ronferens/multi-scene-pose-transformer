@@ -10,7 +10,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn.functional as F
 from torchvision import transforms
+import shutil
 
+##########################
 # Logging and output utils
 ##########################
 def get_stamp_from_log():
@@ -59,7 +61,11 @@ def init_logger(outpath: str = None, suffix: str = None) -> str:
         return log_path
 
 
+def save_code_snapshot(fileprefix: str, path: str, modelname: str) -> None:
+    shutil.make_archive(join(path, f'{fileprefix}_code_snapshot'), 'zip', join(getcwd(), f'models/{modelname.lower()}'))
 
+
+##########################
 # Evaluation utils
 ##########################
 def pose_err(est_pose, gt_pose):
@@ -77,6 +83,8 @@ def pose_err(est_pose, gt_pose):
     orient_err = 2 * torch.acos(torch.abs(inner_prod)) * 180 / np.pi
     return posit_err, orient_err
 
+
+##########################
 # Plotting utils
 ##########################
 def plot_loss_func(sample_count, loss_vals, loss_fig_path):
@@ -88,6 +96,10 @@ def plot_loss_func(sample_count, loss_vals, loss_fig_path):
     plt.ylabel('Loss')
     plt.savefig(loss_fig_path)
 
+
+##########################
+# Transforms
+##########################
 # Augmentations
 train_transforms = {
     'baseline': transforms.Compose([transforms.ToPILImage(),
