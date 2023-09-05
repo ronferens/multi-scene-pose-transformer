@@ -110,13 +110,18 @@ if __name__ == "__main__":
     device = torch.device(device_id)
 
     # Create the model
-    model = get_model(args.model_name, args.backbone_path, config).to(device)
+    model, model_dir = get_model(args.model_name, args.backbone_path, config)
+    model.to(device)
+
     # Load the checkpoint if needed
     if args.checkpoint_path:
         model.load_state_dict(torch.load(args.checkpoint_path, map_location=device_id))
         logging.info("Initializing from checkpoint: {}".format(args.checkpoint_path))
 
     if args.mode == 'train':
+        # Saving a snapshot of the code
+        utils.save_code_snapshot(utils.get_stamp_from_log(), log_path, model_dir)
+
         # Set to train mode
         model.train()
 
