@@ -4,7 +4,8 @@ The Efficient Multi-Scene TransPoseNet model
 
 import torch
 from torch import nn
-from MSTransPoseNet import MSTransPoseNet
+import torch.nn.functional as F
+from .MSTransPoseNet import MSTransPoseNet
 
 
 class EMSTransPoseNet(MSTransPoseNet):
@@ -21,8 +22,8 @@ class EMSTransPoseNet(MSTransPoseNet):
         # =========================================
         self.reg_hidden_dim = config.get('reg_hidden_dim')
         self.hyper_dim = config.get('hyper_dim')
-        self.hypernet_t_fc = nn.Linear(self.reg_hidden_dim, self.hyper_dim * (self.reg_hidden_dim + 1))
-        self.hypernet_rot_fc = nn.Linear(self.reg_hidden_dim, self.hyper_dim * (self.reg_hidden_dim + 1))
+        self.hypernet_t_fc = nn.Linear(decoder_dim, self.hyper_dim * (self.reg_hidden_dim + 1))
+        self.hypernet_rot_fc = nn.Linear(decoder_dim, self.hyper_dim * (self.reg_hidden_dim + 1))
 
         # =========================================
         # Regressor Heads
@@ -100,3 +101,20 @@ class HyperPoseRegressor(nn.Module):
         for p in self.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
+
+    def forward(self, x, hyper_weights):
+        """
+        Forward pass
+        """
+        if self.use_prior:
+            x = F.gelu(self.fc_h_prior(x))
+        else:
+            x = F.gelu(self.fc_h(x))
+
+        x = F.gelu(self.batched_linear_layer(x, hyper_weights.view(hyper_weights.shape[0],
+                                                                   (self._hidden_dim + 1),
+                                                                   self._hyper_dim)))
+
+        x = self.fc_o(x)
+
+        return x
