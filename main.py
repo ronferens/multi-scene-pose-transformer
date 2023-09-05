@@ -11,7 +11,7 @@ import time
 from datasets.CameraPoseDataset import CameraPoseDataset
 from models.pose_losses import CameraPoseLoss
 from models.pose_regressors import get_model
-from os.path import join
+from os.path import join, dirname, basename
 
 
 def test_scene(args, config, model):
@@ -69,6 +69,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("dataset_path", help="path to the physical location of the dataset")
     arg_parser.add_argument("labels_file", help="path to a file mapping images to their poses")
     arg_parser.add_argument("config_file", help="path to configuration file", default="7scenes-config.json")
+    arg_parser.add_argument("--output_path", help="path to save the experiment's output")
     arg_parser.add_argument("--checkpoint_path",
                             help="path to a pre-trained model (should match the model indicated in model_name")
     arg_parser.add_argument("--experiment", help="a short string to describe the experiment/commit used")
@@ -76,7 +77,8 @@ if __name__ == "__main__":
                             help="test set id for testing on all scenes, options: 7scene OR cambridge")
 
     args = arg_parser.parse_args()
-    utils.init_logger()
+
+    log_path = utils.init_logger(outpath=args.output_path)
 
     # Record execution details
     logging.info("Start {} with {}".format(args.model_name, args.mode))
@@ -167,7 +169,7 @@ if __name__ == "__main__":
         n_epochs = config.get("n_epochs")
 
         # Train
-        checkpoint_prefix = join(utils.create_output_dir('out'),utils.get_stamp_from_log())
+        checkpoint_prefix = join(log_path, utils.get_stamp_from_log())
         n_total_samples = 0.0
         loss_vals = []
         sample_count = []
@@ -242,7 +244,13 @@ if __name__ == "__main__":
     else:  # Test
         if args.test_dataset_id is not None:
             args.test_dataset_id = args.test_dataset_id.lower()
-            f = open("{}_{}_report.csv".format(args.test_dataset_id, utils.get_stamp_from_log()), 'w')
+            if args.checkpoint_path is not None:
+                res_path = dirname(args.checkpoint_path)
+                filename = basename(args.checkpoint_path).split('.')[0]
+            else:
+                res_path = log_path
+                filename = utils.get_stamp_from_log()
+            f = open(f'{res_path}/{args.test_dataset_id}_{filename}_report.csv', 'w')
             f.write("scene,pos,ori\n")
             if args.test_dataset_id == "7scenes":
                 dataset_file_prefix = './datasets/7scenes/abs_7scenes_pose.csv'
