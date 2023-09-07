@@ -85,7 +85,6 @@ class MSTransPoseNet(nn.Module):
         scene_log_distr = torch.log(nn.Softmax(dim=1)(self.scene_embed(torch.cat((local_descs_t,
                                                                                   local_descs_rot), dim=2)))).squeeze(2)
 
-
         _, max_indices = scene_log_distr.max(dim=1)
         if scene_indices is not None:
             max_indices = scene_indices
