@@ -22,12 +22,12 @@ class MSTransPoseNet(nn.Module):
         num_scenes = config.get("num_scenes")
         self.backbone = build_backbone(config)
 
-        config_t = {**config}
-        config_t["num_encoder_layers"] = config["num_t_encoder_layers"]
-        config_t["num_decoder_layers"] = config["num_t_decoder_layers"]
-        config_rot = {**config}
-        config_rot["num_encoder_layers"] = config["num_rot_encoder_layers"]
-        config_rot["num_decoder_layers"] = config["num_rot_decoder_layers"]
+        config_t = {**config,
+                    "num_encoder_layers": config["num_t_encoder_layers"],
+                    "num_decoder_layers": config["num_t_decoder_layers"]}
+        config_rot = {**config,
+                      "num_encoder_layers": config["num_rot_encoder_layers"],
+                      "num_decoder_layers": config["num_rot_decoder_layers"]}
         self.transformer_t = Transformer(config_t)
         self.transformer_rot = Transformer(config_rot)
 
@@ -41,9 +41,16 @@ class MSTransPoseNet(nn.Module):
 
         self.log_softmax = nn.LogSoftmax(dim=1)
 
-        self.scene_embed = nn.Linear(decoder_dim*2, 1)
+        self.scene_embed = nn.Linear(decoder_dim * 2, 1)
         self.regressor_head_t = nn.Sequential(*[PoseRegressor(decoder_dim, 3) for _ in range(num_scenes)])
         self.regressor_head_rot = nn.Sequential(*[PoseRegressor(decoder_dim, 4) for _ in range(num_scenes)])
+
+        self._features, self._embeds, self._pos = None, None, None
+        self._src_t, self._mask_t = None, None
+        self._src_rot, self._mask_rot = None, None
+        self._max_indices = None
+        self._global_desc_t, self._global_desc_rot = None, None
+        self._scene_log_distr = None
 
     def forward_transformers(self, samples, scene_indices):
         """
@@ -64,39 +71,38 @@ class MSTransPoseNet(nn.Module):
             samples = nested_tensor_from_tensor_list(samples)
 
         # Extract the features and the position embedding from the visual backbone
-        features, pos = self.backbone(samples)
+        self._features, self._embeds, self._pos = self.backbone(samples)
 
-        src_t, mask_t = features[0].decompose()
-        src_rot, mask_rot = features[1].decompose()
+        self._src_t, self._mask_t = self._features[0].decompose()
+        self._src_rot, self._mask_rot = self._features[1].decompose()
 
         # Run through the transformer to translate to "camera-pose" language
-        assert mask_t is not None
-        assert mask_rot is not None
-        local_descs_t = self.transformer_t(self.input_proj_t(src_t),
-                                           mask_t,
+        assert self._mask_t is not None
+        assert self._mask_rot is not None
+        local_descs_t = self.transformer_t(self.input_proj_t(self._src_t),
+                                           self._mask_t,
                                            self.query_embed_t.weight,
-                                           pos[0])[0][0]
-        local_descs_rot = self.transformer_rot(self.input_proj_rot(src_rot),
-                                               mask_rot,
+                                           self._pos[0])[0][0]
+        local_descs_rot = self.transformer_rot(self.input_proj_rot(self._src_rot),
+                                               self._mask_rot,
                                                self.query_embed_rot.weight,
-                                               pos[1])[0][0]
+                                               self._pos[1])[0][0]
 
         # Get the scene index with FC + log-softmax
-        scene_log_distr = torch.log(nn.Softmax(dim=1)(self.scene_embed(torch.cat((local_descs_t,
+        self._scene_log_distr = torch.log(nn.Softmax(dim=1)(self.scene_embed(torch.cat((local_descs_t,
                                                                                   local_descs_rot), dim=2)))).squeeze(2)
 
-        _, max_indices = scene_log_distr.max(dim=1)
+        _, self._max_indices = self._scene_log_distr.max(dim=1)
         if scene_indices is not None:
-            max_indices = scene_indices
+            self._max_indices = scene_indices
+
         # Take the global latents by zeroing other scene's predictions and summing up
-        w = local_descs_t*0
-        w[range(batch_size),max_indices, :] = 1
-        global_desc_t = torch.sum(w * local_descs_t, dim=1)
-        global_desc_rot = torch.sum(w * local_descs_rot, dim=1)
+        w = local_descs_t * 0
+        w[range(batch_size), self._max_indices, :] = 1
+        self._global_desc_t = torch.sum(w * local_descs_t, dim=1)
+        self._global_desc_rot = torch.sum(w * local_descs_rot, dim=1)
 
-        return global_desc_t, global_desc_rot, scene_log_distr, max_indices
-
-    def forward_heads(self, global_desc_t, global_desc_rot, scene_log_distr, max_indices):
+    def forward_heads(self):
         """
         Forward pass of the MLP heads
         The forward pass execpts a dictionary with two keys-values:
@@ -106,13 +112,13 @@ class MSTransPoseNet(nn.Module):
         max_indices: the index of the max value in the scene distribution
         returns: dictionary with key-value 'pose'--expected pose (NX7) and scene_log_distr
         """
-        batch_size = global_desc_t.shape[0]
-        expected_pose = torch.zeros((batch_size,7)).to(global_desc_t.device).to(global_desc_t.dtype)
+        batch_size = self._global_desc_t.shape[0]
+        expected_pose = torch.zeros((batch_size, 7)).to(self._global_desc_t.device).to(self._global_desc_t.dtype)
         for i in range(batch_size):
-            x_t = self.regressor_head_t[max_indices[i]](global_desc_t[i].unsqueeze(0))
-            x_rot = self.regressor_head_rot[max_indices[i]](global_desc_rot[i].unsqueeze(0))
+            x_t = self.regressor_head_t[self._max_indices[i]](self._global_desc_t[i].unsqueeze(0))
+            x_rot = self.regressor_head_rot[self._max_indices[i]](self._global_desc_rot[i].unsqueeze(0))
             expected_pose[i, :] = torch.cat((x_t, x_rot), dim=1)
-        return expected_pose, scene_log_distr
+        return expected_pose, self._scene_log_distr
 
     def forward(self, samples, scene_indices):
         """ The forward pass expects a dictionary with the following keys-values
@@ -125,16 +131,12 @@ class MSTransPoseNet(nn.Module):
         'pose': expected pose (NX7)
         'log_scene_distr': (log) probability distribution over scenes
         """
-        global_desc_t, global_desc_rot, scene_log_distr, max_indices = self.forward_transformers(samples,
-                                                                                                 scene_indices)
+        self.forward_transformers(samples, scene_indices)
+
         # Regress the pose from the image descriptors
+        expected_pose, self._scene_log_distr = self.forward_heads()
 
-        expected_pose, scene_log_distr = self.forward_heads(global_desc_t,
-                                                            global_desc_rot,
-                                                            scene_log_distr,
-                                                            max_indices)
-
-        return expected_pose, scene_log_distr
+        return expected_pose, self._scene_log_distr
 
 
 class PoseRegressor(nn.Module):

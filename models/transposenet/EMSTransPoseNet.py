@@ -20,24 +20,42 @@ class EMSTransPoseNet(MSTransPoseNet):
         # =========================================
         # Hypernetwork
         # =========================================
-        self.reg_hidden_dim = config.get('reg_hidden_dim')
-        self.hyper_dim = config.get('hyper_dim')
-        self.hypernet_t_fc_h = nn.Linear(decoder_dim, self.reg_hidden_dim * (decoder_dim + 1))
-        self.hypernet_t_fc_o = nn.Linear(decoder_dim, 3 * (self.reg_hidden_dim + 1))
-        self.hypernet_rot_fc_h = nn.Linear(decoder_dim, self.reg_hidden_dim * (decoder_dim + 1))
-        self.hypernet_rot_fc_o = nn.Linear(decoder_dim, 4 * (self.reg_hidden_dim + 1))
+        self.hyper_dim_t = config.get('hyper_dim_t')
+        self.hyper_in_t_proj = nn.Linear(in_features=1280, out_features=decoder_dim)
+        self.hyper_in_t_fc_0 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hyper_in_t_fc_1 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hyper_in_t_fc_2 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hypernet_t_fc_h0 = nn.Linear(decoder_dim, self.hyper_dim_t * (decoder_dim + 1))
+        self.hypernet_t_fc_h1 = nn.Linear(decoder_dim, (self.hyper_dim_t // 2) * (self.hyper_dim_t + 1))
+        self.hypernet_t_fc_h2 = nn.Linear(decoder_dim, 3 * ((self.hyper_dim_t // 2) + 1))
+
+        self.hyper_dim_rot = config.get('hyper_dim_rot')
+        self.hyper_in_rot_proj = nn.Linear(in_features=1280, out_features=decoder_dim)
+        self.hyper_in_rot_fc_0 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hyper_in_rot_fc_1 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hyper_in_rot_fc_2 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
+        self.hypernet_rot_fc_h0 = nn.Linear(decoder_dim, self.hyper_dim_rot * (decoder_dim + 1))
+        self.hypernet_rot_fc_h1 = nn.Linear(decoder_dim, self.hyper_dim_rot * (self.hyper_dim_rot + 1))
+        self.hypernet_rot_fc_h2 = nn.Linear(decoder_dim, 4 * (self.hyper_dim_rot + 1))
 
         # =========================================
         # Regressor Heads
         # =========================================
-        self.hyper_regressor_head_t = HyperPoseRegressor(input_dim=decoder_dim,
-                                                         hidden_dim=self.reg_hidden_dim,
-                                                         output_dim=3)
-        self.hyper_regressor_head_rot = HyperPoseRegressor(input_dim=decoder_dim,
-                                                           hidden_dim=self.reg_hidden_dim,
-                                                           output_dim=4)
+        # (1) Hypernetworks' regressors for position (t) and orientation (rot)
+        self.regressor_hyper_t = PoseRegressorHyper(decoder_dim, self.hyper_dim_t, 3, hidden_scale=0.5)
+        self.regressor_hyper_rot = PoseRegressorHyper(decoder_dim, self.hyper_dim_rot, 4, hidden_scale=1.0)
 
-    def forward_heads(self, global_desc_t, global_desc_rot, scene_log_distr, max_indices):
+        # (2) Regressors for position (t) and orientation (rot)
+        self.regressor_head_t = PoseRegressor(decoder_dim, 3)
+        self.regressor_head_rot = PoseRegressor(decoder_dim, 4)
+
+        self.w_t, self.w_rot = None, None
+
+    @staticmethod
+    def _swish(x):
+        return x * F.sigmoid(x)
+
+    def forward_heads(self):
         """
         Forward pass of the MLP heads
         The forward pass execpts a dictionary with two keys-values:
@@ -51,44 +69,60 @@ class EMSTransPoseNet(MSTransPoseNet):
         ##################################################
         # Hypernet
         ##################################################
-        hyper_w_t_fc_h = self.hypernet_t_fc_h(global_desc_t)
-        hyper_w_t_fc_o = self.hypernet_t_fc_o(global_desc_t)
-        hyper_w_rot_h = self.hypernet_rot_fc_h(global_desc_rot)
-        hyper_w_rot_o = self.hypernet_rot_fc_o(global_desc_rot)
+        t_input = torch.add(self._global_desc_t, self.hyper_in_t_proj(self._embeds))
+        hyper_in_h0 = self._swish(self.hyper_in_t_fc_0(t_input))
+        hyper_w_t_fc_h0 = self.hypernet_t_fc_h0(hyper_in_h0)
+        hyper_in_h1 = self._swish(self.hyper_in_t_fc_1(t_input))
+        hyper_w_t_fc_h1 = self.hypernet_t_fc_h1(hyper_in_h1)
+        hyper_in_h2 = self._swish(self.hyper_in_t_fc_2(t_input))
+        hyper_w_t_fc_h2 = self.hypernet_t_fc_h2(hyper_in_h2)
+
+        rot_input = torch.add(self._global_desc_rot, self.hyper_in_rot_proj(self._embeds))
+        hyper_in_h0 = self._swish(self.hyper_in_rot_fc_0(rot_input))
+        hyper_w_rot_fc_h0 = self.hypernet_rot_fc_h0(hyper_in_h0)
+        hyper_in_h1 = self._swish(self.hyper_in_rot_fc_1(rot_input))
+        hyper_w_rot_fc_h1 = self.hypernet_rot_fc_h1(hyper_in_h1)
+        hyper_in_h2 = self._swish(self.hyper_in_rot_fc_2(rot_input))
+        hyper_w_rot_fc_h2 = self.hypernet_rot_fc_h2(hyper_in_h2)
+
+        self.w_t = {'w_h1': hyper_w_t_fc_h0, 'w_h2': hyper_w_t_fc_h1, 'w_o': hyper_w_t_fc_h2}
+        self.w_rot = {'w_h1': hyper_w_rot_fc_h0, 'w_h2': hyper_w_rot_fc_h1, 'w_o': hyper_w_rot_fc_h2}
 
         ##################################################
         # Regression
         ##################################################
-        x_t = self.hyper_regressor_head_t(global_desc_t, hyper_w_t_fc_h, hyper_w_t_fc_o)
-        x_rot = self.hyper_regressor_head_rot(global_desc_rot, hyper_w_rot_h, hyper_w_rot_o)
+        # (1) Hypernetwork's regressors
+        x_hyper_t = self.regressor_hyper_t(self._global_desc_t, self.w_t)
+        x_hyper_rot = self.regressor_hyper_rot(self._global_desc_rot, self.w_rot)
+
+        # (2) Trained regressors
+        x_t = self.regressor_head_t(self._global_desc_t)
+        x_rot = self.regressor_head_rot(self._global_desc_rot)
+
+        ##################################################
+        # Output
+        ##################################################
+        x_t = torch.add(x_t, x_hyper_t)
+        x_rot = torch.add(x_rot, x_hyper_rot)
 
         expected_pose = torch.cat((x_t, x_rot), dim=1)
-        return expected_pose, scene_log_distr
+        return expected_pose, self._scene_log_distr
 
 
-class HyperPoseRegressor(nn.Module):
-    """ An MLP with hypernetwork's weights to regress a pose component"""
+class PoseRegressorHyper(nn.Module):
+    """ A simple MLP to regress a pose component"""
 
-    def __init__(self, input_dim, hidden_dim, output_dim, use_prior=False):
+    def __init__(self, decoder_dim, hidden_dim, output_dim, hidden_scale=1.0):
         """
         decoder_dim: (int) the input dimension
-        hidden_dim: (int) the hidden dimension
         output_dim: (int) the output dimension
-        use_prior: (bool) whether to use prior information
+        hidden_scale: (float) Ratio between the input and the hidden layers' dimensions
         """
         super().__init__()
-        self._input_dim = input_dim
-        self._hidden_dim = hidden_dim
-        self._output_dim = output_dim
-
-        self.fc_h = nn.Linear(self._input_dim, self._hidden_dim)
-
-        self.use_prior = use_prior
-        if self.use_prior:
-            self.fc_h_prior = nn.Linear(self._input_dim * 2, self._hidden_dim)
-
-        self.fc_o = nn.Linear(self._hidden_dim, self._output_dim)
-        self._reset_parameters()
+        self.decoder_dim = decoder_dim
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        self.hidden_scale = hidden_scale
 
     @staticmethod
     def batched_linear_layer(x, wb):
@@ -97,28 +131,24 @@ class HyperPoseRegressor(nn.Module):
         linear_res = torch.matmul(torch.cat([x, one], dim=-1).unsqueeze(1), wb)
         return linear_res.squeeze(1)
 
-    def _reset_parameters(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+    @staticmethod
+    def _swish(x):
+        return x * F.sigmoid(x)
 
-    def forward(self, x, hyper_weights_h, hyper_weights_o):
+    def forward(self, x, weights):
         """
         Forward pass
         """
-        x_hyper_h = F.gelu(self.batched_linear_layer(x, hyper_weights_h.view(hyper_weights_h.shape[0],
-                                                                                   (self._input_dim + 1),
-                                                                                   self._hidden_dim)))
-        if self.use_prior:
-            x = F.gelu(self.fc_h_prior(x))
-        else:
-            x = F.gelu(self.fc_h(x))
-
-        x = torch.add(x, x_hyper_h)
-
-        x_hyper_o = F.gelu(self.batched_linear_layer(x, hyper_weights_o.view(hyper_weights_o.shape[0],
-                                                                             (self._hidden_dim + 1),
-                                                                             self._output_dim)))
-        x = self.fc_o(x)
-        x = torch.add(x, x_hyper_o)
+        x = self._swish(self.batched_linear_layer(x, weights.get('w_h1').view(weights.get('w_h1').shape[0],
+                                                                              (self.decoder_dim + 1),
+                                                                              self.hidden_dim)))
+        for index in range(len(weights.keys()) - 2):
+            x = self._swish(self.batched_linear_layer(x,
+                                                      weights.get(f'w_h{index + 2}').view(
+                                                          weights.get(f'w_h{index + 2}').shape[0],
+                                                          (self.hidden_dim + 1),
+                                                          (int(self.hidden_dim * self.hidden_scale)))))
+        x = self.batched_linear_layer(x, weights.get('w_o').view(weights.get('w_o').shape[0],
+                                                                 (int(self.hidden_dim * self.hidden_scale) + 1),
+                                                                 self.output_dim))
         return x

@@ -28,7 +28,9 @@ class BackboneBase(nn.Module):
             assert m is not None
             mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
             out[name] = NestedTensor(x, mask)
-        return out
+
+        embds_out = self.body.extract_features(tensor_list.tensors).mean(dim=(-2, -1))
+        return out, embds_out
 
 
 class Backbone(BackboneBase):
@@ -43,7 +45,7 @@ class Joiner(nn.Sequential):
         super().__init__(backbone, position_embedding)
 
     def forward(self, tensor_list: NestedTensor):
-        xs = self[0](tensor_list)
+        xs, embds_out = self[0](tensor_list)
         out: List[NestedTensor] = []
         pos = []
         for name, x in xs.items():
@@ -56,7 +58,7 @@ class Joiner(nn.Sequential):
             else:
                 pos.append(ret.to(x.tensors.dtype))
 
-        return out, pos
+        return out, embds_out, pos
 
 def build_backbone(config):
     position_embedding = build_position_encoding(config)
