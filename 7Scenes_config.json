@@ -8,7 +8,7 @@
 	"ems-transposenet":
 	{
 		"batch_size": 8,
-        "equalize_scenes": false,
+        "equalize_scenes": true,
 		"num_scenes": 7,
 		"learnable": true,
 		"s_x": 0.0,
@@ -36,7 +36,5 @@
 		"freeze_exclude_phrase": ["hyper_in_t_proj", "hyper_in_t_fc_0", "hyper_in_t_fc_1", "hyper_in_t_fc_2", "regressor_hyper_t", "regressor_head_t", "transformer_t", "input_proj_t"],
 		"no_augment": true
 	}
-
-	
 }
 
