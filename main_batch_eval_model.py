@@ -122,7 +122,7 @@ if __name__ == "__main__":
         args.test_dataset_id = args.test_dataset_id.lower()
 
         if args.test_dataset_id == "7scenes":
-            dataset_file_prefix = './datasets/7scenes/abs_7scenes_pose.csv'
+            dataset_file_prefix = './datasets/7Scenes/abs_7scenes_pose.csv'
             scenes = ["chess", "fire", "heads", "office", "pumpkin", "redkitchen", "stairs"]
         elif args.test_dataset_id == "cambridge":
             dataset_file_prefix = './datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv'
