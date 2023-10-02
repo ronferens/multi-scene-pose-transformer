@@ -21,13 +21,15 @@ class EMSTransPoseNet(MSTransPoseNet):
         # Hypernetwork
         # =========================================
         self.hyper_dim_t = config.get('hyper_dim_t')
+        self.hyper_t_hidden_scale = config.get('hyper_t_hidden_scale')
         self.hyper_in_t_proj = nn.Linear(in_features=1280, out_features=decoder_dim)
         self.hyper_in_t_fc_0 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
         self.hyper_in_t_fc_1 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
         self.hyper_in_t_fc_2 = nn.Linear(in_features=decoder_dim, out_features=decoder_dim)
         self.hypernet_t_fc_h0 = nn.Linear(decoder_dim, self.hyper_dim_t * (decoder_dim + 1))
-        self.hypernet_t_fc_h1 = nn.Linear(decoder_dim, (self.hyper_dim_t // 2) * (self.hyper_dim_t + 1))
-        self.hypernet_t_fc_h2 = nn.Linear(decoder_dim, 3 * ((self.hyper_dim_t // 2) + 1))
+        self.hypernet_t_fc_h1 = nn.Linear(decoder_dim,
+                                          int(self.hyper_dim_t * self.hyper_t_hidden_scale) * (self.hyper_dim_t + 1))
+        self.hypernet_t_fc_h2 = nn.Linear(decoder_dim, 3 * (int(self.hyper_dim_t * self.hyper_t_hidden_scale) + 1))
 
         self.hyper_dim_rot = config.get('hyper_dim_rot')
         self.hyper_in_rot_proj = nn.Linear(in_features=1280, out_features=decoder_dim)
@@ -42,7 +44,8 @@ class EMSTransPoseNet(MSTransPoseNet):
         # Regressor Heads
         # =========================================
         # (1) Hypernetworks' regressors for position (t) and orientation (rot)
-        self.regressor_hyper_t = PoseRegressorHyper(decoder_dim, self.hyper_dim_t, 3, hidden_scale=0.5)
+        self.regressor_hyper_t = PoseRegressorHyper(decoder_dim, self.hyper_dim_t, 3,
+                                                    hidden_scale=self.hyper_t_hidden_scale)
         self.regressor_hyper_rot = PoseRegressorHyper(decoder_dim, self.hyper_dim_rot, 4, hidden_scale=1.0)
 
         # (2) Regressors for position (t) and orientation (rot)
