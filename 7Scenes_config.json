@@ -29,6 +29,7 @@
 		"reg_hidden_dim": 1024,
 		"hyper_dim_t": 256,
 		"hyper_dim_rot": 512,
+		"hyper_t_hidden_scale": 0.25,
 		"dropout": 0.1,
 		"nheads": 4,
         "reduction": ["reduction_4", "reduction_3"],
