@@ -12,6 +12,7 @@ from datasets.CameraPoseDataset import CameraPoseDataset
 from models.pose_losses import CameraPoseLoss
 from models.pose_regressors import get_model
 from os.path import join, dirname, basename
+from torch.utils.tensorboard import SummaryWriter
 
 
 def test_scene(args, config, model):
@@ -78,7 +79,9 @@ if __name__ == "__main__":
 
     args = arg_parser.parse_args()
 
+    # Logger and TensorBoard logger init
     log_path = utils.init_logger(outpath=args.output_path)
+    tb_logger = SummaryWriter(log_dir=f'runs/{args.dataset_path.split("/")[-1]}_{utils.get_stamp_from_log()}')
 
     # Record execution details
     logging.info("Start {} with {}".format(args.model_name, args.mode))
@@ -196,8 +199,7 @@ if __name__ == "__main__":
                 if freeze:  # For TransPoseNet
                     model.eval()
                     with torch.no_grad():
-                        global_desc_t, global_desc_rot, scene_log_distr, max_indices = model.forward_transformers(
-                            minibatch.get('img'), minibatch.get('scene'))
+                        model.forward_transformers(minibatch.get('img'), minibatch.get('scene'))
                     model.train()
 
                 # Zero the gradients
@@ -205,7 +207,7 @@ if __name__ == "__main__":
 
                 # Forward pass to estimate the pose
                 if freeze:
-                    est_pose, est_scene_log_distr = model.forward_heads(global_desc_t, global_desc_rot, scene_log_distr, max_indices)
+                    est_pose, est_scene_log_distr = model.forward_heads()
                 else:
                     est_pose, est_scene_log_distr = model(minibatch.get('img'), minibatch.get('scene'))
 
@@ -233,6 +235,13 @@ if __name__ == "__main__":
                         batch_idx + 1, epoch + 1, (running_loss / n_samples),
                         posit_err.mean().item(),
                         orient_err.mean().item()))
+
+                    # TensorBoard logging
+                    tb_logger.add_scalar('Loss', (running_loss / n_samples), (epoch + 1))
+                    tb_logger.add_scalar('PoseErr/Translation', posit_err.mean().item(), (epoch + 1))
+                    tb_logger.add_scalar('PoseErr/Orientation', orient_err.mean().item(), (epoch + 1))
+                    tb_logger.add_scalar('LearningRate', scheduler.get_lr()[0], (epoch + 1))
+
             # Save checkpoint
             if (epoch % n_freq_checkpoint) == 0 and epoch > 0:
                 torch.save(model.state_dict(), checkpoint_prefix + '_checkpoint-{}.pth'.format(epoch))
@@ -274,3 +283,6 @@ if __name__ == "__main__":
             f.close()
         else:
             _ = test_scene(args, config, model)
+
+    # TensorBoard logger teardown
+    tb_logger.close()
