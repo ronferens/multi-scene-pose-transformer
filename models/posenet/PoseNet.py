@@ -34,17 +34,19 @@ class PoseNet(nn.Module):
             if isinstance(m, nn.Linear):
                 torch.nn.init.kaiming_normal_(m.weight)
 
-    def forward(self, data):
+    def forward(self, samples):
         """
         Forward pass
-        :param data: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
+        :param samples: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
         :return: (torch.Tensor) dictionary with key-value 'pose' -- 7-dimensional absolute pose for (N X 7)
         """
-        x = self.backbone.extract_features(data.get('img'))
+        x = self.backbone.extract_features(samples)
         x = self.avg_pooling_2d(x)
         x = x.flatten(start_dim=1)
         x = self.dropout(F.relu(self.fc1(x)))
         p_x = self.fc2(x)
         p_q = self.fc3(x)
-        return {'pose': torch.cat((p_x, p_q), dim=1)}
+
+        est_pose = torch.cat((p_x, p_q), dim=1)
+        return est_pose
 
