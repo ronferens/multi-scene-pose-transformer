@@ -3,16 +3,16 @@
 		"n_freq_print": 5,
 		"n_freq_checkpoint": 1,
 		"n_workers": 4,
-		"device_id": "cuda:2"
+		"device_id": "cuda:0"
 	},
 	"mshyperpose":
 	{
 		"batch_size": 8,
         "equalize_scenes": false,
 		"num_scenes": 7,
-		"learnable": false,
-		"s_x": 1.0,
-		"s_q": 0.0,
+		"learnable": true,
+		"s_x": 0.0,
+		"s_q": -3.0,
 		"lr": 1e-4,
 		"norm": 2,
 		"weight_decay": 1e-4,
@@ -29,11 +29,11 @@
 		"reg_hidden_dim": 1024,
 		"hyper_dim_t": 256,
 		"hyper_dim_rot": 512,
-		"hyper_t_hidden_scale": 0.25,
+		"hyper_t_hidden_scale": 0.5,
 		"dropout": 0.1,
 		"nheads": 4,
         "reduction": ["reduction_4", "reduction_3"],
-		"freeze": true,
+		"freeze": false,
 		"freeze_exclude_phrase": ["hyper_in_t_proj", "hyper_in_t_fc_0", "hyper_in_t_fc_1", "hyper_in_t_fc_2", "regressor_hyper_t", "regressor_head_t", "transformer_t", "input_proj_t"],
 		"no_augment": true
 	}
