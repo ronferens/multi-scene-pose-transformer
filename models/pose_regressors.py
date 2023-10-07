@@ -1,6 +1,7 @@
 from .posenet.PoseNet import PoseNet
-from .transposenet.EMSTransPoseNet import EMSTransPoseNet
-from  .transposenet.MSTransPoseNet import MSTransPoseNet
+from .hyperpose.HyperPose import HyperPose
+from .hyperpose.MSHyperPose import MSHyperPose
+from  .hyperpose.MSTransPoseNet import MSTransPoseNet
 from typing import Dict, Tuple
 
 
@@ -14,9 +15,11 @@ def get_model(model_name: str, backbone_path: str, config: Dict) -> Tuple:
     """
     if model_name == 'posenet':
         return PoseNet(backbone_path), 'posenet'
+    if model_name == 'hyperpose':
+        return HyperPose(config, backbone_path), 'hyperpose'
     elif model_name == 'ms-transposenet':
-        return MSTransPoseNet(config, backbone_path), 'transposenet'
-    elif model_name == 'ems-transposenet':
-        return EMSTransPoseNet(config, backbone_path), 'transposenet'
+        return MSTransPoseNet(config, backbone_path), 'mstransposenet'
+    elif model_name == 'mshyperpose':
+        return MSHyperPose(config, backbone_path), 'hyperpose'
     else:
         raise "{} not supported".format(model_name)

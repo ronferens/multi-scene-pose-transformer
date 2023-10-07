@@ -48,7 +48,7 @@ def init_logger(outpath: str = None, suffix: str = None) -> str:
     with open(join(path, 'log_config.json')) as json_file:
         log_config_dict = json.load(json_file)
         filename = log_config_dict.get('handlers').get('file_handler').get('filename')
-        filename = ''.join([filename, "_", time.strftime("%d_%m_%y_%H_%M", time.localtime())])
+        filename = ''.join([filename, "_", time.strftime("%y_%m_%d_%H_%M_%S", time.localtime())])
 
         # Creating logs' folder is needed
         if outpath is not None:

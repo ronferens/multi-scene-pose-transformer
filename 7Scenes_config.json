@@ -1,25 +1,25 @@
 {
 	"general": {
 		"n_freq_print": 5,
-		"n_freq_checkpoint": 5,
+		"n_freq_checkpoint": 1,
 		"n_workers": 4,
-		"device_id": "cuda:0"
+		"device_id": "cuda:2"
 	},
-	"ems-transposenet":
+	"mshyperpose":
 	{
 		"batch_size": 8,
-        "equalize_scenes": true,
+        "equalize_scenes": false,
 		"num_scenes": 7,
-		"learnable": true,
-		"s_x": 0.0,
-		"s_q": -3.0,
+		"learnable": false,
+		"s_x": 1.0,
+		"s_q": 0.0,
 		"lr": 1e-4,
 		"norm": 2,
 		"weight_decay": 1e-4,
 		"eps": 1e-10,
-		"lr_scheduler_gamma": 0.75,
-		"lr_scheduler_step_size": 10,
-		"n_epochs": 30,
+		"lr_scheduler_gamma": 0.5,
+		"lr_scheduler_step_size": 2,
+		"n_epochs": 10,
 		"num_t_encoder_layers": 4,
 		"num_t_decoder_layers": 4,
 		"num_rot_encoder_layers": 4,
@@ -33,7 +33,7 @@
 		"dropout": 0.1,
 		"nheads": 4,
         "reduction": ["reduction_4", "reduction_3"],
-		"freeze": false,
+		"freeze": true,
 		"freeze_exclude_phrase": ["hyper_in_t_proj", "hyper_in_t_fc_0", "hyper_in_t_fc_1", "hyper_in_t_fc_2", "regressor_hyper_t", "regressor_head_t", "transformer_t", "input_proj_t"],
 		"no_augment": true
 	}

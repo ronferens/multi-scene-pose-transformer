@@ -1,14 +1,17 @@
-"""
-The Efficient Multi-Scene TransPoseNet model
-"""
-
 import torch
 from torch import nn
 import torch.nn.functional as F
 from .MSTransPoseNet import MSTransPoseNet, PoseRegressor
 
 
-class EMSTransPoseNet(MSTransPoseNet):
+class MSHyperPose(MSTransPoseNet):
+    """
+        The Multi-Scene HyperPose model
+
+        The model consist of a backbone feature extractor module followed by a dual-branch Transformer Encoders.
+        With the addition of a dedicated hypernet at each branch the input query image's position and orientation is
+        regressed.
+        """
 
     def __init__(self, config, pretrained_path):
         """ Initializes the model.
@@ -18,7 +21,7 @@ class EMSTransPoseNet(MSTransPoseNet):
         decoder_dim = self.transformer_t.d_model
 
         # =========================================
-        # Hypernetwork
+        # Hyper networks
         # =========================================
         self.hyper_dim_t = config.get('hyper_dim_t')
         self.hyper_t_hidden_scale = config.get('hyper_t_hidden_scale')
@@ -43,7 +46,7 @@ class EMSTransPoseNet(MSTransPoseNet):
         # =========================================
         # Regressor Heads
         # =========================================
-        # (1) Hypernetworks' regressors for position (t) and orientation (rot)
+        # (1) Hyper-networks' regressors for position (t) and orientation (rot)
         self.regressor_hyper_t = PoseRegressorHyper(decoder_dim, self.hyper_dim_t, 3,
                                                     hidden_scale=self.hyper_t_hidden_scale)
         self.regressor_hyper_rot = PoseRegressorHyper(decoder_dim, self.hyper_dim_rot, 4, hidden_scale=1.0)
@@ -61,7 +64,7 @@ class EMSTransPoseNet(MSTransPoseNet):
     def forward_heads(self):
         """
         Forward pass of the MLP heads
-        The forward pass execpts a dictionary with two keys-values:
+        The forward pass excepts a dictionary with two keys-values:
         global_desc_t: latent representation from the position encoder
         global_dec_rot: latent representation from the orientation encoder
         scene_log_distr: the log softmax over the scenes
@@ -70,7 +73,7 @@ class EMSTransPoseNet(MSTransPoseNet):
         """
 
         ##################################################
-        # Hypernet
+        # Hyper-networks Forward Pass
         ##################################################
         t_input = torch.add(self._global_desc_t, self.hyper_in_t_proj(self._embeds))
         hyper_in_h0 = self._swish(self.hyper_in_t_fc_0(t_input))
@@ -92,9 +95,9 @@ class EMSTransPoseNet(MSTransPoseNet):
         self.w_rot = {'w_h1': hyper_w_rot_fc_h0, 'w_h2': hyper_w_rot_fc_h1, 'w_o': hyper_w_rot_fc_h2}
 
         ##################################################
-        # Regression
+        # Regression Forward Pass
         ##################################################
-        # (1) Hypernetwork's regressors
+        # (1) Hyper-network's regressors
         x_hyper_t = self.regressor_hyper_t(self._global_desc_t, self.w_t)
         x_hyper_rot = self.regressor_hyper_rot(self._global_desc_rot, self.w_rot)
 
@@ -113,13 +116,16 @@ class EMSTransPoseNet(MSTransPoseNet):
 
 
 class PoseRegressorHyper(nn.Module):
-    """ A simple MLP to regress a pose component"""
+    """
+    The hyper-networks-based regression head
+    This module receives both the input vector to process and the weights for its 3-layers regression
+    """
 
     def __init__(self, decoder_dim, hidden_dim, output_dim, hidden_scale=1.0):
         """
         decoder_dim: (int) the input dimension
         output_dim: (int) the output dimension
-        hidden_scale: (float) Ratio between the input and the hidden layers' dimensions
+        hidden_scale: (float) Determines the ratio between the input and the hidden layers' dimensions
         """
         super().__init__()
         self.decoder_dim = decoder_dim
@@ -129,6 +135,11 @@ class PoseRegressorHyper(nn.Module):
 
     @staticmethod
     def batched_linear_layer(x, wb):
+        """
+        Explicit implementation of a batched linear regression
+        x: (Tensor) the input tensor to process
+        wb: (Tensor) The weights and bias of the regression layer
+        """
         # x: (B, N, D1); wb: (B, D1 + 1, D2) or (D1 + 1, D2)
         one = torch.ones(*x.shape[:-1], 1, device=x.device)
         linear_res = torch.matmul(torch.cat([x, one], dim=-1).unsqueeze(1), wb)
@@ -136,21 +147,30 @@ class PoseRegressorHyper(nn.Module):
 
     @staticmethod
     def _swish(x):
+        """
+        Implementation of the Swish activation layer
+        Reference: "Searching for Activation Functions" [https://arxiv.org/abs/1710.05941v2]
+        """
         return x * F.sigmoid(x)
 
     def forward(self, x, weights):
         """
         Forward pass
+        x: (Tensor) the input tensor to process
+        weights: (Dict) A dictionary holding the weights and biases of the input, hidden and output regression layers
         """
+        # Regressing over the input layer
         x = self._swish(self.batched_linear_layer(x, weights.get('w_h1').view(weights.get('w_h1').shape[0],
                                                                               (self.decoder_dim + 1),
                                                                               self.hidden_dim)))
+        # Regressing over all hidden layers
         for index in range(len(weights.keys()) - 2):
             x = self._swish(self.batched_linear_layer(x,
                                                       weights.get(f'w_h{index + 2}').view(
                                                           weights.get(f'w_h{index + 2}').shape[0],
                                                           (self.hidden_dim + 1),
                                                           (int(self.hidden_dim * self.hidden_scale)))))
+        # Regressing over the output layer
         x = self.batched_linear_layer(x, weights.get('w_o').view(weights.get('w_o').shape[0],
                                                                  (int(self.hidden_dim * self.hidden_scale) + 1),
                                                                  self.output_dim))

@@ -64,7 +64,7 @@ def test_scene(args, config, model, scene_name, checkpoint_path, verbose=False):
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("model_name",
-                            help="name of model to create (e.g. posenet, transposenet")
+                            help="name of model to create (e.g. posenet, hyperpose")
     arg_parser.add_argument("mode", help="train or eval")
     arg_parser.add_argument("backbone_path", help="path to backbone .pth - e.g. efficientnet")
     arg_parser.add_argument("dataset_path", help="path to the physical location of the dataset")
