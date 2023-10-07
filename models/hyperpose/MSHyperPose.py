@@ -111,8 +111,8 @@ class MSHyperPose(MSTransPoseNet):
         x_t = torch.add(x_t, x_hyper_t)
         x_rot = torch.add(x_rot, x_hyper_rot)
 
-        expected_pose = torch.cat((x_t, x_rot), dim=1)
-        return expected_pose, self._scene_log_distr
+        est_pose = torch.cat((x_t, x_rot), dim=1)
+        return est_pose, self._scene_log_distr
 
 
 class PoseRegressorHyper(nn.Module):
