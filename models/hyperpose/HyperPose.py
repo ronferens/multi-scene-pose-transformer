@@ -117,6 +117,6 @@ class HyperPose(nn.Module):
         x_t = torch.add(p_x, p_x_hyper)
         x_rot = torch.add(p_q, p_q_hyper)
 
-        expected_pose = torch.cat((x_t, x_rot), dim=1)
-        return expected_pose
+        est_pose = torch.cat((x_t, x_rot), dim=1)
+        return est_pose
 
