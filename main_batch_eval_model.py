@@ -2,8 +2,8 @@
 Entry point training and testing multi-scene transformer
 """
 import argparse
-import pandas as pd
 import torch
+import pandas as pd
 import numpy as np
 import json
 import logging
@@ -11,10 +11,12 @@ from util import utils
 import time
 from datasets.CameraPoseDataset import CameraPoseDataset
 from models.pose_regressors import get_model
-from os.path import join
+from os.path import splitext, join
+import plotly
+import plotly.graph_objects as go
 
 
-def test_scene(args, config, model, scene_name, checkpoint_path, verbose=False):
+def test_scene(args, config, model, verbose=False):
     model.eval()
 
     # Set the dataset and data loader
@@ -32,13 +34,11 @@ def test_scene(args, config, model, scene_name, checkpoint_path, verbose=False):
             for k, v in minibatch.items():
                 minibatch[k] = v.to(device)
 
-            minibatch['scene'] = None  # avoid using ground-truth scene during prediction
-
             gt_pose = minibatch.get('pose').to(dtype=torch.float32)
 
             # Forward pass to predict the pose
             tic = time.time()
-            est_pose, _ = model(minibatch.get('img'), minibatch.get('scene'))
+            est_pose = model(minibatch.get('img'))
             toc = time.time()
 
             # Evaluate error
@@ -49,12 +49,7 @@ def test_scene(args, config, model, scene_name, checkpoint_path, verbose=False):
             stats[i, 1] = orient_err.item()
             stats[i, 2] = (toc - tic) * 1000
 
-        if verbose:
-            logging.info("Pose error: {:.3f}[m], {:.3f}[deg], inferred in {:.2f}[ms]".format(
-                stats[i, 0], stats[i, 1], stats[i, 2]))
-
     # Record overall statistics
-    logging.info("\tPerformance on scene: {}".format(scene_name))
     logging.info("\tMedian pose error: {:.3f}[m], {:.3f}[deg]".format(np.nanmedian(stats[:, 0]),
                                                                       np.nanmedian(stats[:, 1])))
     logging.info("\tMean inference time:{:.2f}[ms]".format(np.mean(stats[:, 2])))
@@ -72,10 +67,8 @@ if __name__ == "__main__":
     arg_parser.add_argument("config_file", help="path to configuration file", default="7scenes-config.json")
     arg_parser.add_argument("checkpoint_path",
                             help="path to a pre-trained model (should match the model indicated in model_name")
-    arg_parser.add_argument("test_dataset_id", default=None,
-                            help="test set id for testing on all scenes, options: 7scene OR cambridge")
     arg_parser.add_argument("--output_path", help="path to save the experiment's output")
-    arg_parser.add_argument("---ckpt_start_index", help="indicating the first checkpoint to test", default=0, type=int)
+    arg_parser.add_argument("--ckpt_start_index", help="indicating the first checkpoint to test", default=0, type=int)
 
     args = arg_parser.parse_args()
 
@@ -118,26 +111,6 @@ if __name__ == "__main__":
         models_to_check.append('final')
     batch_eval_results = []
 
-    if args.test_dataset_id is not None:
-        args.test_dataset_id = args.test_dataset_id.lower()
-
-        if args.test_dataset_id == "7scenes":
-            dataset_file_prefix = './datasets/7Scenes/abs_7scenes_pose.csv'
-            scenes = ["chess", "fire", "heads", "office", "pumpkin", "redkitchen", "stairs"]
-        elif args.test_dataset_id == "cambridge":
-            dataset_file_prefix = './datasets/CambridgeLandmarks/abs_cambridge_pose_sorted.csv'
-            scenes = ["KingsCollege", "OldHospital", "ShopFacade", "StMarysChurch"]
-        else:
-            raise ValueError(f'Unsupported test_dataset_id: {args.test_dataset_id}')
-
-        cols = ['model']
-        for s in scenes:
-            cols.append(f'{s}_x')
-            cols.append(f'{s}_q')
-        cols.append('avrg_x')
-        cols.append('avrg_q')
-        results_data = pd.DataFrame(columns=cols)
-
     num_models = len(models_to_check)
     logging.info(f'Number of model to evaluate : {num_models}')
     for model_index, ckpt in enumerate(models_to_check):
@@ -150,16 +123,43 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(model_path, map_location=device_id))
         logging.info(f'{model_index + 1}/{num_models}) Initializing from checkpoint: {model_path}')
 
-        results_scene = []
-        for scene in scenes:
-            args.labels_file = f'{dataset_file_prefix}_{scene}_test.csv'
-            stats = test_scene(args, config, model, scene, model_path)
+        stats = test_scene(args, config, model, model_path)
 
-            results_scene.append(np.nanmedian(stats[:, 0]))
-            results_scene.append(np.nanmedian(stats[:, 1]))
+        # Saving the models' evaluation results
+        checkpoint_name = splitext(model_path.split('_')[-1])[0]
+        batch_eval_results.append([checkpoint_name,
+                                   model_path,
+                                   np.nanmedian(stats[:, 0]),
+                                   np.nanmedian(stats[:, 1])])
 
-        results_avrg = [np.mean(results_scene[0::2]), np.mean(results_scene[1::2])]
-        results_data.loc[model_index] = [ckpt] + results_scene + results_avrg
+    # Saving the results
+    col_chk_pnt = 'checkpoint'
+    col_model = 'Model'
+    col_pos_err = 'Median Position Error [m]'
+    col_orient_err = 'Median Orientation Error[deg]'
+    batch_eval_results = pd.DataFrame(batch_eval_results, columns=[col_chk_pnt,
+                                                                   col_model,
+                                                                   col_pos_err,
+                                                                   col_orient_err])
 
-    # Saving all models results to output file (.csv)
-    results_data.to_csv(join(args.checkpoint_path, f'{args.test_dataset_id}_report.csv'), index=False)
+    batch_eval_results.to_csv(join(args.checkpoint_path, f'{checkpoint_name}_batch_eval.csv'))
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=batch_eval_results[col_chk_pnt],
+                             y=batch_eval_results[col_pos_err],
+                             mode='lines+markers',
+                             name=col_pos_err))
+    fig.add_trace(go.Scatter(x=batch_eval_results[col_chk_pnt],
+                             y=batch_eval_results[col_orient_err],
+                             mode='lines+markers',
+                             name=col_orient_err))
+    fig.update_layout(
+        title="Batch model evaluation: {}".format(args.model_name.capitalize()),
+        xaxis_title="Model",
+        yaxis_title="Position and Orientation Errors",
+        legend_title="Error Type",
+        font=dict(family="Courier New, monospace")
+    )
+
+    # Plotting and saving the figure
+    plotly.offline.plot(fig, filename=join(args.checkpoint_path, f'{checkpoint_name}_batch_eval.html'))
