@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .MSHyperPose import PoseRegressorHyper
+from .PoseRegressorHyper import PoseRegressorHyper
 
 
 class HyperPose(nn.Module):
@@ -31,24 +31,17 @@ class HyperPose(nn.Module):
         # =========================================
         # Hyper networks
         # =========================================
-        self.hyper_dim_t = backbone_dim
+        self.hyper_dim_t = config.get('hyper_dim_t')
         self.hyper_t_hidden_scale = config.get('hyper_t_hidden_scale')
-        self.hyper_in_t_proj = nn.Linear(in_features=1280, out_features=self.hyper_dim_t)
-        self.hyper_in_t_fc_0 = nn.Linear(in_features=self.hyper_dim_t, out_features=self.hyper_dim_t)
-        self.hyper_in_t_fc_1 = nn.Linear(in_features=self.hyper_dim_t, out_features=self.hyper_dim_t)
+        self.hyper_in_t_proj = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_t)
+        self.hyper_in_t = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_t)
         self.hyper_in_t_fc_2 = nn.Linear(in_features=self.hyper_dim_t, out_features=self.hyper_dim_t)
-        self.hypernet_t_fc_h0 = nn.Linear(self.hyper_dim_t, self.hyper_dim_t * (self.hyper_dim_t + 1))
-        self.hypernet_t_fc_h1 = nn.Linear(self.hyper_dim_t,
-                                          int(self.hyper_dim_t * self.hyper_t_hidden_scale) * (self.hyper_dim_t + 1))
-        self.hypernet_t_fc_h2 = nn.Linear(self.hyper_dim_t, 3 * (int(self.hyper_dim_t * self.hyper_t_hidden_scale) + 1))
+        self.hypernet_t_fc_h2 = nn.Linear(self.hyper_dim_t, 3 * (self.hyper_dim_t + 1))
 
         self.hyper_dim_rot = config.get('hyper_dim_rot')
-        self.hyper_in_rot_proj = nn.Linear(in_features=1280, out_features=self.hyper_dim_rot)
-        self.hyper_in_rot_fc_0 = nn.Linear(in_features=self.hyper_dim_rot, out_features=self.hyper_dim_rot)
-        self.hyper_in_rot_fc_1 = nn.Linear(in_features=self.hyper_dim_rot, out_features=self.hyper_dim_rot)
+        self.hyper_in_rot_proj = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_rot)
+        self.hyper_in_rot = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_rot)
         self.hyper_in_rot_fc_2 = nn.Linear(in_features=self.hyper_dim_rot, out_features=self.hyper_dim_rot)
-        self.hypernet_rot_fc_h0 = nn.Linear(self.hyper_dim_rot, self.hyper_dim_rot * (self.hyper_dim_rot + 1))
-        self.hypernet_rot_fc_h1 = nn.Linear(self.hyper_dim_rot, self.hyper_dim_rot * (self.hyper_dim_rot + 1))
         self.hypernet_rot_fc_h2 = nn.Linear(self.hyper_dim_rot, 4 * (self.hyper_dim_rot + 1))
 
         # Initialize FC layers
@@ -64,16 +57,20 @@ class HyperPose(nn.Module):
                                                     hidden_scale=self.hyper_t_hidden_scale)
         self.regressor_hyper_rot = PoseRegressorHyper(self.hyper_dim_rot, self.hyper_dim_rot, 4, hidden_scale=1.0)
 
-    def forward(self, data):
+    @staticmethod
+    def _swish(x):
+        return x * F.sigmoid(x)
+
+    def forward(self, samples):
         """
         Forward pass
-        :param data: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
+        :param samples: (torch.Tensor) dictionary with key-value 'img' -- input image (N X C X H X W)
         :return: (torch.Tensor) dictionary with key-value 'pose' -- 7-dimensional absolute pose for (N X 7)
         """
         ##################################################
         # Backbone Forward Pass
         ##################################################
-        x = self.backbone.extract_features(data.get('img'))
+        x = self.backbone.extract_features(samples)
         x = self.avg_pooling_2d(x)
         x = x.flatten(start_dim=1)
 
@@ -81,30 +78,22 @@ class HyperPose(nn.Module):
         # Hyper-networks Forward Pass
         ##################################################
         t_input = self.hyper_in_t_proj(x)
-        hyper_in_h0 = self._swish(self.hyper_in_t_fc_0(t_input))
-        hyper_w_t_fc_h0 = self.hypernet_t_fc_h0(hyper_in_h0)
-        hyper_in_h1 = self._swish(self.hyper_in_t_fc_1(t_input))
-        hyper_w_t_fc_h1 = self.hypernet_t_fc_h1(hyper_in_h1)
         hyper_in_h2 = self._swish(self.hyper_in_t_fc_2(t_input))
         hyper_w_t_fc_h2 = self.hypernet_t_fc_h2(hyper_in_h2)
 
         rot_input = self.hyper_in_rot_proj(x)
-        hyper_in_h0 = self._swish(self.hyper_in_rot_fc_0(rot_input))
-        hyper_w_rot_fc_h0 = self.hypernet_rot_fc_h0(hyper_in_h0)
-        hyper_in_h1 = self._swish(self.hyper_in_rot_fc_1(rot_input))
-        hyper_w_rot_fc_h1 = self.hypernet_rot_fc_h1(hyper_in_h1)
         hyper_in_h2 = self._swish(self.hyper_in_rot_fc_2(rot_input))
         hyper_w_rot_fc_h2 = self.hypernet_rot_fc_h2(hyper_in_h2)
 
-        self.w_t = {'w_h1': hyper_w_t_fc_h0, 'w_h2': hyper_w_t_fc_h1, 'w_o': hyper_w_t_fc_h2}
-        self.w_rot = {'w_h1': hyper_w_rot_fc_h0, 'w_h2': hyper_w_rot_fc_h1, 'w_o': hyper_w_rot_fc_h2}
+        self.w_t = {'w_o': hyper_w_t_fc_h2}
+        self.w_rot = {'w_o': hyper_w_rot_fc_h2}
 
         ##################################################
         # Regression Forward Pass
         ##################################################
         # (1) Hyper-network's regressors
-        p_x_hyper = self.regressor_hyper_t(self._global_desc_t, self.w_t)
-        p_q_hyper = self.regressor_hyper_rot(self._global_desc_rot, self.w_rot)
+        p_x_hyper = self.regressor_hyper_t(self.hyper_in_t(x), self.w_t)
+        p_q_hyper = self.regressor_hyper_rot(self.hyper_in_rot(x), self.w_rot)
 
         # (2) Trained regressors
         x = self.dropout(F.relu(self.fc1(x)))
@@ -119,4 +108,3 @@ class HyperPose(nn.Module):
 
         est_pose = torch.cat((x_t, x_rot), dim=1)
         return est_pose
-
