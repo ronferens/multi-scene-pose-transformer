@@ -54,7 +54,7 @@ class PoseRegressorHyper(nn.Module):
                                                                                   self.hidden_dim)))
         # Regressing over all hidden layers
         for index in range(len(weights.keys()) - 2):
-            if 'w_h{index + 2}' in weights:
+            if f'w_h{index + 2}' in weights:
                 x = self._swish(self.batched_linear_layer(x,
                                                           weights.get(f'w_h{index + 2}').view(
                                                               weights.get(f'w_h{index + 2}').shape[0],
