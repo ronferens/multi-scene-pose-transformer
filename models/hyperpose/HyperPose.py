@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .PoseRegressorHyper import PoseRegressorHyper
+from .MSHyperPose import PoseRegressorHyper
 
 
 class HyperPose(nn.Module):
@@ -54,7 +54,7 @@ class HyperPose(nn.Module):
         # =========================================
         # (1) Hyper-networks' regressors for position (t) and orientation (rot)
         self.regressor_hyper_t = PoseRegressorHyper(self.hyper_dim_t, self.hyper_dim_t, 3,
-                                                    hidden_scale=self.hyper_t_hidden_scale)
+                                                    hidden_scale=1.0)
         self.regressor_hyper_rot = PoseRegressorHyper(self.hyper_dim_rot, self.hyper_dim_rot, 4, hidden_scale=1.0)
 
     @staticmethod
