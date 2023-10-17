@@ -1,4 +1,4 @@
-from .posenet.PoseNet import PoseNet
+from .posenet.PoseNet import PoseNet, EffPoseNet
 from .hyperpose.HyperPose import HyperPose
 from .hyperpose.MSHyperPose import MSHyperPose
 from  .hyperpose.MSTransPoseNet import MSTransPoseNet
@@ -14,8 +14,10 @@ def get_model(model_name: str, backbone_path: str, config: Dict) -> Tuple:
     :return: instance of the model (nn.Module) and the name of the model's folder
     """
     if model_name == 'posenet':
-        return PoseNet(backbone_path), 'posenet'
-    if model_name == 'hyperpose':
+        return PoseNet(), 'posenet'
+    elif model_name == 'effposenet':
+        return EffPoseNet(backbone_path), 'posenet'
+    elif model_name == 'hyperpose':
         return HyperPose(config, backbone_path), 'hyperpose'
     elif model_name == 'ms-transposenet':
         return MSTransPoseNet(config, backbone_path), 'mstransposenet'
