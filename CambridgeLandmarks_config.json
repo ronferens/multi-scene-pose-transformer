@@ -1,9 +1,9 @@
 {
 	"general": {
 		"n_freq_print": 5,
-		"n_freq_checkpoint": 10,
+		"n_freq_checkpoint": 5,
 		"n_workers": 4,
-		"device_id": "cuda:2"
+		"device_id": "cuda:0"
 	},
 	"posenet": {
 		"batch_size": 32,
@@ -18,21 +18,34 @@
 		"lr_scheduler_gamma": 0.5,
 		"n_epochs": 600
 	},
-	"hyperpose": {
-		"batch_size": 4,
+	"effposenet": {
+		"batch_size": 32,
 		"learnable": true,
 		"s_x": -3.0,
 		"s_q": -6.5,
 		"norm": 2,
-		"lr": 1e-4,
+		"lr": 1e-3,
 		"weight_decay": 1e-4,
 		"eps": 1e-10,
 		"lr_scheduler_step_size": 200,
-		"lr_scheduler_gamma": 0.9,
-		"n_epochs": 1000,
+		"lr_scheduler_gamma": 0.5,
+		"n_epochs": 600
+	},
+	"hyperpose": {
+		"batch_size": 8,
+		"learnable": true,
+		"s_x": -3.0,
+		"s_q": -6.5,
+		"norm": 2,
+		"lr": 1e-3,
+		"weight_decay": 1e-4,
+		"eps": 1e-10,
+		"lr_scheduler_step_size": 200,
+		"lr_scheduler_gamma": 0.5,
+		"n_epochs": 600,
 		"hyper_dim_t": 256,
 		"hyper_dim_rot": 512,
-		"hyper_t_hidden_scale": 0.5
+		"backbone_type": "googlenet"
 	},
 	"mshyperpose":
 	{
@@ -46,8 +59,8 @@
 		"norm": 2,
 		"weight_decay": 1e-4,
 		"eps": 1e-10,
-		"lr_scheduler_gamma": 0.75,
 		"lr_scheduler_step_size": 200,
+		"lr_scheduler_gamma": 0.75,
 		"n_epochs": 600,
 		"num_t_encoder_layers": 4,
 		"num_t_decoder_layers": 4,
