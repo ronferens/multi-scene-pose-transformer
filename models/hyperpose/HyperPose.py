@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .MSHyperPose import PoseRegressorHyper
+import torchvision
 
 
 class HyperPose(nn.Module):
@@ -15,32 +16,37 @@ class HyperPose(nn.Module):
         """
         super(HyperPose, self).__init__()
 
-        # Efficient net
-        self.backbone = torch.load(backbone_path)
-        backbone_dim = 1280
+        if config.get('backbone_type') == 'googlenet':
+            self._backbone = torchvision.models.googlenet(pretrained=True)
+            self._backbone_forward = self._backbone_forward_googlenet
+            self._backbone_dim = 1000
+        elif config.get('backbone_type') == 'efficientnet':
+            # EfficientNet Backbone
+            self._backbone = torch.load(backbone_path)
+            self._backbone_forward = self._backbone_forward_efficientnet
+            self.avg_pooling_2d = nn.AdaptiveAvgPool2d(1)
+            self._backbone_dim = 1280
         latent_dim = 1024
 
         # Regressor layers
-        self.fc1 = nn.Linear(backbone_dim, latent_dim)
+        self.fc1 = nn.Linear(self._backbone_dim, latent_dim)
         self.fc2 = nn.Linear(latent_dim, 3)
         self.fc3 = nn.Linear(latent_dim, 4)
-
         self.dropout = nn.Dropout(p=0.1)
-        self.avg_pooling_2d = nn.AdaptiveAvgPool2d(1)
 
         # =========================================
         # Hyper networks
         # =========================================
         self.hyper_dim_t = config.get('hyper_dim_t')
         self.hyper_t_hidden_scale = config.get('hyper_t_hidden_scale')
-        self.hyper_in_t_proj = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_t)
-        self.hyper_in_t = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_t)
+        self.hyper_in_t_proj = nn.Linear(in_features=self._backbone_dim, out_features=self.hyper_dim_t)
+        self.hyper_in_t = nn.Linear(in_features=self._backbone_dim, out_features=self.hyper_dim_t)
         self.hyper_in_t_fc_2 = nn.Linear(in_features=self.hyper_dim_t, out_features=self.hyper_dim_t)
         self.hypernet_t_fc_h2 = nn.Linear(self.hyper_dim_t, 3 * (self.hyper_dim_t + 1))
 
         self.hyper_dim_rot = config.get('hyper_dim_rot')
-        self.hyper_in_rot_proj = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_rot)
-        self.hyper_in_rot = nn.Linear(in_features=backbone_dim, out_features=self.hyper_dim_rot)
+        self.hyper_in_rot_proj = nn.Linear(in_features=self._backbone_dim, out_features=self.hyper_dim_rot)
+        self.hyper_in_rot = nn.Linear(in_features=self._backbone_dim, out_features=self.hyper_dim_rot)
         self.hyper_in_rot_fc_2 = nn.Linear(in_features=self.hyper_dim_rot, out_features=self.hyper_dim_rot)
         self.hypernet_rot_fc_h2 = nn.Linear(self.hyper_dim_rot, 4 * (self.hyper_dim_rot + 1))
 
@@ -61,6 +67,16 @@ class HyperPose(nn.Module):
     def _swish(x):
         return x * F.sigmoid(x)
 
+    def _backbone_forward_googlenet(self, samples):
+        x = self._backbone(samples)
+        return x
+
+    def _backbone_forward_efficientnet(self, samples):
+        x = self._backbone.extract_features(samples)
+        x = self.avg_pooling_2d(x)
+        x = x.flatten(start_dim=1)
+        return x
+
     def forward(self, samples):
         """
         Forward pass
@@ -70,9 +86,7 @@ class HyperPose(nn.Module):
         ##################################################
         # Backbone Forward Pass
         ##################################################
-        x = self.backbone.extract_features(samples)
-        x = self.avg_pooling_2d(x)
-        x = x.flatten(start_dim=1)
+        x = self._backbone_forward(samples)
 
         ##################################################
         # Hyper-networks Forward Pass
