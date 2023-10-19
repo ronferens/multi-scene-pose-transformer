@@ -1,7 +1,8 @@
 from .posenet.PoseNet import PoseNet, EffPoseNet
 from .hyperpose.HyperPose import HyperPose
+from .atloc.atloc import AtLoc, HyperAtLoc
 from .hyperpose.MSHyperPose import MSHyperPose
-from  .hyperpose.MSTransPoseNet import MSTransPoseNet
+from .hyperpose.MSTransPoseNet import MSTransPoseNet
 from typing import Dict, Tuple
 
 
@@ -19,6 +20,10 @@ def get_model(model_name: str, backbone_path: str, config: Dict) -> Tuple:
         return EffPoseNet(backbone_path), 'posenet'
     elif model_name == 'hyperpose':
         return HyperPose(config, backbone_path), 'hyperpose'
+    elif model_name == 'atloc':
+        return AtLoc(), 'atloc'
+    elif model_name == 'hyperatloc':
+        return HyperAtLoc(config), 'atloc'
     elif model_name == 'ms-transposenet':
         return MSTransPoseNet(config, backbone_path), 'mstransposenet'
     elif model_name == 'mshyperpose':
