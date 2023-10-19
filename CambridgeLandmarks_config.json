@@ -37,15 +37,45 @@
 		"s_x": -3.0,
 		"s_q": -6.5,
 		"norm": 2,
+		"lr": 1e-4,
+		"weight_decay": 1e-4,
+		"eps": 1e-10,
+		"lr_scheduler_step_size": 10,
+		"lr_scheduler_gamma": 0.75,
+		"n_epochs": 100,
+		"hyper_dim_t": 256,
+		"hyper_dim_rot": 512,
+		"backbone_type": "efficientnet",
+		"freeze": false,
+		"freeze_exclude_phrase": ["hyper_in_rot_proj", "hyper_in_rot", "hyper_in_rot_fc_2", "hypernet_rot_fc_h2", "fc3"]
+	},
+	"atloc": {
+		"batch_size": 32,
+		"learnable": true,
+		"s_x": -3.0,
+		"s_q": -6.5,
+		"norm": 2,
 		"lr": 1e-3,
 		"weight_decay": 1e-4,
 		"eps": 1e-10,
 		"lr_scheduler_step_size": 200,
 		"lr_scheduler_gamma": 0.5,
+		"n_epochs": 600
+	},
+	"hyperatloc": {
+		"batch_size": 8,
+		"learnable": true,
+		"s_x": -3.0,
+		"s_q": -6.5,
+		"norm": 2,
+		"lr": 1e-4,
+		"weight_decay": 1e-4,
+		"eps": 1e-10,
+		"lr_scheduler_step_size": 200,
+		"lr_scheduler_gamma": 0.75,
 		"n_epochs": 600,
 		"hyper_dim_t": 256,
-		"hyper_dim_rot": 512,
-		"backbone_type": "googlenet"
+		"hyper_dim_rot": 512
 	},
 	"mshyperpose":
 	{
