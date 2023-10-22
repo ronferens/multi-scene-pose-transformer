@@ -1,9 +1,28 @@
 {
 	"general": {
 		"n_freq_print": 5,
-		"n_freq_checkpoint": 10,
+		"n_freq_checkpoint": 1,
 		"n_workers": 4,
-		"device_id": "cuda:0"
+		"device_id": "cuda:2"
+	},
+	"hyperpose": {
+		"batch_size": 8,
+		"learnable": true,
+		"s_x": 0.0,
+		"s_q": 0.0,
+		"norm": 2,
+		"lr": 1e-4,
+		"weight_decay": 1e-4,
+		"eps": 1e-10,
+		"lr_scheduler_step_size": 20,
+		"lr_scheduler_gamma": 0.5,
+		"n_epochs": 100,
+		"hyper_dim_t": 256,
+		"hyper_dim_rot": 512,
+		"backbone_type": "efficientnet",
+		"freeze": true,
+		"freeze_exclude_phrase": ["hyper_in_rot_proj", "hyper_in_rot", "hyper_in_rot_fc_2", "hypernet_rot_fc_h2"],
+		"no_augment": false
 	},
 	"mshyperpose":
 	{
