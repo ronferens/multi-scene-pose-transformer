@@ -75,7 +75,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("test_dataset_id", default=None,
                             help="test set id for testing on all scenes, options: 7scene OR cambridge")
     arg_parser.add_argument("--output_path", help="path to save the experiment's output")
-    arg_parser.add_argument("---ckpt_start_index", help="indicating the first checkpoint to test", default=0, type=int)
+    arg_parser.add_argument("--ckpt_start_index", help="indicating the first checkpoint to test", default=0, type=int)
 
     args = arg_parser.parse_args()
 
