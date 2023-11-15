@@ -25,14 +25,14 @@ def get_stamp_from_log() -> str:
     Get the time stamp from the log file
     :return:
     """
-    return split(logging.getLogger().handlers[0].baseFilename)[-1].replace(".log","")
+    return split(logging.getLogger().handlers[0].baseFilename)[-1].replace(".log", "")
 
 
 def create_output_dir(name: str) -> str:
     """
     Create a new directory for outputs, if it does not already exist
     :param name: (str) the name of the directory
-    :return: the path to the outpur directory
+    :return: the path to the output directory
     """
     if not exists(name):
         makedirs(name, exist_ok=True)
@@ -42,6 +42,8 @@ def create_output_dir(name: str) -> str:
 def init_logger(outpath: str = None, suffix: str = None) -> str:
     """
     Initialize the logger and create a time stamp for the file
+    :param outpath: The output path to save the log file
+    :param suffix:
     """
     path = split(realpath(__file__))[0]
 
@@ -67,6 +69,9 @@ def init_logger(outpath: str = None, suffix: str = None) -> str:
 
 
 def save_code_snapshot(fileprefix: str, path: str, modelname: str) -> None:
+    """
+    Saves a copy of the trained/tested model into the desired output path
+    """
     shutil.make_archive(join(path, f'{fileprefix}_code_snapshot'), 'zip', join(getcwd(), f'models/{modelname.lower()}'))
 
 
@@ -128,7 +133,14 @@ train_transforms = {
                                     transforms.ColorJitter(0.5, 0.5, 0.5, 0.2),
                                     transforms.ToTensor(),
                                     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                             std=[0.229, 0.224, 0.225])])
+                                                         std=[0.229, 0.224, 0.225])]),
+
+    'robotcar': transforms.Compose([transforms.ToPILImage(),
+                                    transforms.Resize(256),
+                                    transforms.RandomCrop(224),
+                                    transforms.ColorJitter(0.7, 0.7, 0.7, 0.5),
+                                    transforms.ToTensor(),
+                                    transforms.Lambda(lambda x: np.asarray(x))])
 
 }
 test_transforms = {
@@ -137,9 +149,12 @@ test_transforms = {
                                     transforms.CenterCrop(224),
                                     transforms.ToTensor(),
                                     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                             std=[0.229, 0.224, 0.225])
-        ])
+                                                         std=[0.229, 0.224, 0.225])
+                                    ]),
+
+    'robotcar': transforms.Compose([transforms.ToPILImage(),
+                                    transforms.Resize(256),
+                                    transforms.CenterCrop(224),
+                                    transforms.ToTensor(),
+                                    transforms.Lambda(lambda x: np.asarray(x))])
 }
-
-
-

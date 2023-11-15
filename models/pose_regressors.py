@@ -24,8 +24,8 @@ def get_model(model_name: str, backbone_path: str, config: Dict) -> Tuple:
         return AtLoc(), 'atloc'
     elif model_name == 'hyperatloc':
         return HyperAtLoc(config), 'atloc'
-    elif model_name == 'ms-transposenet':
-        return MSTransPoseNet(config, backbone_path), 'mstransposenet'
+    elif model_name == 'ems-transposenet':
+        return MSTransPoseNet(config, backbone_path), 'emstransposenet'
     elif model_name == 'mshyperpose':
         return MSHyperPose(config, backbone_path), 'hyperpose'
     else:
