@@ -7,7 +7,7 @@ single output is selected. The strongest response, shown as an overlaid color-co
 ![Multi-Scene Camera Pose Regression Illustration](./img/teaser.PNG)
 
 
-<a style="font-weight:bold" href="https://github.com/yolish/multi-scene-pose-transformer" target="_blank">Project Page</a>
+<a style="font-weight:bold" href="https://ronferens.github.io/multi-scene-pose-transformer/" target="_blank">Project Page</a>
 ---
 
 ### Repository Overview 
