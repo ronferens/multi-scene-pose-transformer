@@ -8,6 +8,8 @@ single output is selected. The strongest response, shown as an overlaid color-co
 
 
 <a style="font-weight:bold" href="https://ronferens.github.io/multi-scene-pose-transformer/" target="_blank">Project Page</a>
+
+
 ---
 
 ### Repository Overview 
