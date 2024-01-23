@@ -1,8 +1,13 @@
-## Learning Multi-Scene Camera Pose Regression with Transformers (Oral ICCV2021)
+<div align="center">
+<h2>Learning Multi-Scene Camera Pose Regression with Transformers (Oral ICCV2021)</h2>
 
-<p align="center">
-  <a href="https://ronferens.github.io/multi-scene-pose-transformer/" target="_blank"><b>Project Page</b></a>
-</p>
+[**Yoli Shavit**](https://yolish.github.io/) · [**Ron Ferens**](https://ronferens.github.io/) · [**Yosi Keller**](https://yosikeller.github.io/)
+
+Bar-Ilan University
+
+<a href="https://arxiv.org/abs/2103.11468"><img src='https://img.shields.io/badge/arXiv-MSTransformer-red' alt='Paper PDF'></a>
+<a href='https://ronferens.github.io/multi-scene-pose-transformer/'><img src='https://img.shields.io/badge/Project_Page-MSTransformer-green' alt='Project Page' target="_blank"></a>
+</div>
 
 Official PyTorch implementation of a multi-scene camera pose regression paradigm with Transformers, for details see our paper [Learning Multi-Scene Absolute Pose Regression with Transformers](https://arxiv.org/abs/2103.11468).  
 
@@ -10,7 +15,6 @@ Official PyTorch implementation of a multi-scene camera pose regression paradigm
 The figure below illustrates our approach: two transformers separately attend to position-  and orientation- informative features from a convolutional backbone. Scene-specific queries (0-3) are further encoded with aggregated activation maps into latent representations, from which a
 single output is selected. The strongest response, shown as an overlaid color-coded heatmap of attention weights, is obtained with the output associated with the input image's scene. The selected outputs are used to regress the position x and the orientation q.  
 ![Multi-Scene Camera Pose Regression Illustration](./img/teaser.PNG)
-
 
 ---
 
