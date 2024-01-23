@@ -1,5 +1,5 @@
 <div align="center">
-<h2>Learning Multi-Scene Camera Pose Regression with Transformers (Oral ICCV2021)</h2>
+<h2>Learning Multi-Scene Camera Pose Regression with Transformers <br /> (Oral ICCV2021)</h2>
 
 [**Yoli Shavit**](https://yolish.github.io/) · [**Ron Ferens**](https://ronferens.github.io/) · [**Yosi Keller**](https://yosikeller.github.io/)
 
